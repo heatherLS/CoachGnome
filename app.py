@@ -6,12 +6,16 @@ import streamlit.components.v1 as components
 import base64
 import requests
 
+# ---------- CONFIG ----------
 st.set_page_config(page_title="🧙‍♂️ CoachGnome – AI Call Coach", layout="wide")
 
+# Google Sheets URL
 SHEET_URL = "https://docs.google.com/spreadsheets/d/1pKtkFr5x4_RRj-ruXnLZl3D4_IBzkyOnynWjjPac0jo/export?format=csv"
 
+# ---------- AUDIO DOWNLOAD ----------
 @st.cache_data(ttl=3600)
 def download_audio_from_gdrive(drive_url, filename):
+    """Download audio from Google Drive and return as base64"""
     file_id = None
     if "id=" in drive_url:
         file_id = drive_url.split("id=")[1].split("&")[0]
@@ -59,8 +63,10 @@ def download_audio_from_gdrive(drive_url, filename):
     
     return None
 
+# ---------- LOAD DATA ----------
 @st.cache_data(ttl=60)
 def load_data():
+    """Load data from Google Sheets"""
     try:
         df = pd.read_csv(SHEET_URL)
         df['feedback_parsed'] = df['feedback_json'].apply(parse_feedback)
@@ -70,6 +76,7 @@ def load_data():
         return pd.DataFrame()
 
 def parse_feedback(feedback_str):
+    """Parse feedback JSON string"""
     if pd.isna(feedback_str) or not feedback_str:
         return {}
     try:
@@ -84,6 +91,7 @@ def parse_feedback(feedback_str):
         return {}
 
 def aggregate_rep_performance(df, agent_name):
+    """Aggregate all performance data for a specific rep"""
     agent_calls = df[df['agent_name'] == agent_name]
     
     aggregated = {
@@ -124,6 +132,7 @@ def aggregate_rep_performance(df, agent_name):
         if not feedback:
             continue
         
+        # Outcomes
         outcome = feedback.get('call_outcome', '')
         if outcome == 'closed':
             aggregated['outcomes']['closed'] += 1
@@ -132,15 +141,18 @@ def aggregate_rep_performance(df, agent_name):
         elif outcome in ['follow-up-scheduled', 'needs-callback']:
             aggregated['outcomes']['follow_up'] += 1
         
+        # Scores
         call_scores = feedback.get('call_score', {})
         for score_type in aggregated['scores'].keys():
             score_value = call_scores.get(score_type, 0)
             if score_value > 0:
                 aggregated['scores'][score_type].append(score_value)
         
+        # Strengths and weaknesses
         aggregated['common_strengths'].extend(feedback.get('what_went_well', []))
         aggregated['common_weaknesses'].extend(feedback.get('opportunities_to_improve', []))
         
+        # Active listening failures
         listening_fails = feedback.get('active_listening_failures', [])
         for fail in listening_fails:
             aggregated['active_listening_patterns'].append({
@@ -149,6 +161,7 @@ def aggregate_rep_performance(df, agent_name):
                 'filename': row['filename']
             })
         
+        # Probing opportunities
         probing_misses = feedback.get('missed_probing_opportunities', [])
         for miss in probing_misses:
             aggregated['probing_patterns'].append({
@@ -157,6 +170,7 @@ def aggregate_rep_performance(df, agent_name):
                 'filename': row['filename']
             })
         
+        # Emotional cues
         emotional_misses = feedback.get('emotional_cues_missed', [])
         for miss in emotional_misses:
             aggregated['emotional_cue_patterns'].append({
@@ -165,6 +179,7 @@ def aggregate_rep_performance(df, agent_name):
                 'filename': row['filename']
             })
         
+        # Objections
         objections = feedback.get('objection_handling_analysis', [])
         for obj in objections:
             aggregated['objection_patterns'].append({
@@ -175,6 +190,7 @@ def aggregate_rep_performance(df, agent_name):
                 'filename': row['filename']
             })
         
+        # SPIN gaps
         spin = feedback.get('spin_analysis', {})
         if not spin.get('situation_questions_used'):
             aggregated['spin_gaps']['situation'] += 1
@@ -185,6 +201,7 @@ def aggregate_rep_performance(df, agent_name):
         if not spin.get('need_payoff_questions_used'):
             aggregated['spin_gaps']['need_payoff'] += 1
         
+        # Sandler gaps
         sandler = feedback.get('sandler_analysis', {})
         if not sandler.get('upfront_contract_established'):
             aggregated['sandler_gaps']['upfront_contract'] += 1
@@ -197,26 +214,34 @@ def aggregate_rep_performance(df, agent_name):
     
     return aggregated
 
+# ---------- PAGE ----------
 st.title("🧙‍♂️ CoachGnome – AI Call Coach Dashboard")
 st.caption("Powered by SPIN Selling + Sandler Methodology ✨")
 
+# Sidebar controls
 with st.sidebar:
     st.header("📊 Dashboard Controls")
     if st.button("🔄 Refresh Data"):
         st.cache_data.clear()
         st.rerun()
     
-    date_filter = st.selectbox("Time Period", ["Today", "This Week", "This Month", "All Time"])
+    date_filter = st.selectbox(
+        "Time Period",
+        ["Today", "This Week", "This Month", "All Time"]
+    )
+    
     st.markdown("---")
     st.caption("💾 Data synced from Google Sheets")
     st.caption("🎓 Coaching analysis by GPT-4")
 
+# Load data
 df = load_data()
 
 if df.empty:
     st.warning("No data available yet. Upload call recordings to start!")
     st.stop()
 
+# ---------- TABS ----------
 tab0, tab1, tab2, tab3, tab4 = st.tabs([
     "📋 Executive Summary",
     "🏆 Rep Deep Dive", 
@@ -225,11 +250,14 @@ tab0, tab1, tab2, tab3, tab4 = st.tabs([
     "🔍 Call Search"
 ])
 
+# ===== TAB 0: EXECUTIVE SUMMARY =====
 with tab0:
     st.header("📋 Executive Summary - Quick Coaching Priorities")
     st.caption("What needs immediate attention across the team")
     
+    # [EXECUTIVE SUMMARY CODE - keeping as is from your original]
     all_agents = df['agent_name'].dropna().unique()
+    
     team_issues = {
         'active_listening': [],
         'probing': [],
@@ -477,6 +505,7 @@ with tab0:
     else:
         st.success("✅ Team is performing well! Continue monitoring and celebrating wins.")
 
+# ===== TAB 1: REP DEEP DIVE =====
 with tab1:
     st.header("🏆 Rep Performance Deep Dive")
     
@@ -605,9 +634,15 @@ with tab1:
             if agg_data['common_strengths']:
                 strength_counts = {}
                 for strength in agg_data['common_strengths']:
-                    if strength not in strength_counts:
-                        strength_counts[strength] = 0
-                    strength_counts[strength] += 1
+                    # Convert to string if it's a dict or other type
+                    if isinstance(strength, dict):
+                        strength_text = strength.get('text', str(strength))
+                    else:
+                        strength_text = str(strength)
+                    
+                    if strength_text not in strength_counts:
+                        strength_counts[strength_text] = 0
+                    strength_counts[strength_text] += 1
                 
                 top_strengths = sorted(strength_counts.items(), key=lambda x: x[1], reverse=True)[:5]
                 for strength, count in top_strengths:
@@ -620,9 +655,15 @@ with tab1:
             if agg_data['common_weaknesses']:
                 weakness_counts = {}
                 for weakness in agg_data['common_weaknesses']:
-                    if weakness not in weakness_counts:
-                        weakness_counts[weakness] = 0
-                    weakness_counts[weakness] += 1
+                    # Convert to string if it's a dict or other type
+                    if isinstance(weakness, dict):
+                        weakness_text = weakness.get('text', str(weakness))
+                    else:
+                        weakness_text = str(weakness)
+                    
+                    if weakness_text not in weakness_counts:
+                        weakness_counts[weakness_text] = 0
+                    weakness_counts[weakness_text] += 1
                 
                 top_weaknesses = sorted(weakness_counts.items(), key=lambda x: x[1], reverse=True)[:5]
                 for weakness, count in top_weaknesses:
@@ -632,7 +673,7 @@ with tab1:
         
         st.markdown("---")
         
-        st.subheader(f"📞 All Calls with Full Coaching ({agg_data['total_calls']})")
+        st.subheader(f"📞 All Calls with Enhanced Coaching ({agg_data['total_calls']})")
         
         agent_calls = df[df['agent_name'] == selected_agent]
         
@@ -669,8 +710,8 @@ with tab1:
                     
                     st.markdown("---")
                     
+                    # ==== LOAD AUDIO PLAYER FIRST ====
                     audio_available = False
-                    google_drive_url = None
                     player_id = None
                     
                     if pd.notna(row.get('audio_url')) and row.get('audio_url'):
@@ -702,213 +743,327 @@ with tab1:
                     
                     st.subheader("🎯 Coaching Breakdown")
                     
+                    # === ACTIVE LISTENING ===
                     listening_fails = feedback.get('active_listening_failures', [])
                     if listening_fails:
-                        st.markdown("### 🎧 Active Listening Failures")
-                        for fail in listening_fails:
-                            with st.container():
-                                st.markdown(f"**⏱️ Timestamp: {fail.get('timestamp', 'N/A')}**")
-                                
-                                if audio_available and player_id:
-                                    ts = fail.get('timestamp', '00:00')
+                        st.markdown("### 🎧 Active Listening - Coaching Moments")
+                        
+                        for fail_idx, fail in enumerate(listening_fails):
+                            st.markdown(f"#### 📍 Moment {fail_idx + 1} - Timestamp: {fail.get('timestamp', 'N/A')}")
+                            
+                            # Audio jump button
+                            if audio_available and player_id:
+                                ts = fail.get('timestamp', '00:00')
+                                start_seconds = 0
+                                try:
+                                    if ':' in ts:
+                                        parts = ts.split(':')
+                                        if len(parts) == 2:
+                                            start_seconds = int(parts[0]) * 60 + int(parts[1])
+                                        elif len(parts) == 3:
+                                            start_seconds = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+                                    else:
+                                        start_seconds = int(float(ts))
+                                except:
                                     start_seconds = 0
-                                    try:
-                                        if ':' in ts:
-                                            parts = ts.split(':')
-                                            if len(parts) == 2:
-                                                start_seconds = int(parts[0]) * 60 + int(parts[1])
-                                            elif len(parts) == 3:
-                                                start_seconds = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
-                                        else:
-                                            start_seconds = int(float(ts))
-                                    except:
-                                        start_seconds = 0
-                                    
-                                    timestamp_button = f"""
-                                        <div style="margin-bottom:15px; padding:10px; background:#f0f8ff; border-radius:5px;">
-                                            <button onclick="var p = window.parent.document.getElementById('{player_id}'); if (p) {{ p.currentTime = {start_seconds}; p.play(); window.parent.scrollTo({{top: 0, behavior: 'smooth'}}); }}" 
-                                            style="padding:10px 20px; background:#4CAF50; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
-                                                ▶ Jump to {ts}
-                                            </button>
-                                        </div>
-                                    """
-                                    components.html(timestamp_button, height=80)
                                 
-                                col1, col2 = st.columns(2)
-                                with col1:
-                                    st.markdown("**🗣️ What Was Said:**")
-                                    st.info(f"**Customer:** \"{fail.get('customer_said', 'N/A')}\"")
-                                    st.warning(f"**Rep:** \"{fail.get('rep_response', 'N/A')}\"")
-                                
-                                with col2:
-                                    st.markdown("**💡 Coaching:**")
-                                    st.error(f"**Missed:** {fail.get('what_was_missed', 'N/A')}")
-                                    better = fail.get('better_response', '')
-                                    if better:
-                                        st.success(f"**Try Instead:** \"{better}\"")
-                                
-                                st.markdown("---")
+                                timestamp_button = f"""
+                                    <div style="margin-bottom:15px; padding:10px; background:#f0f8ff; border-radius:5px;">
+                                        <button onclick="var p = window.parent.document.getElementById('{player_id}'); if (p) {{ p.currentTime = {start_seconds}; p.play(); window.parent.scrollTo({{top: 0, behavior: 'smooth'}}); }}" 
+                                        style="padding:10px 20px; background:#4CAF50; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
+                                            ▶ Jump to {ts}
+                                        </button>
+                                    </div>
+                                """
+                                components.html(timestamp_button, height=80)
+                            
+                            # Coaching content
+                            st.markdown("**🗣️ What Was Said:**")
+                            col1, col2 = st.columns(2)
+                            with col1:
+                                st.info(f"**Customer:** \"{fail.get('customer_said', 'N/A')}\"")
+                            with col2:
+                                st.warning(f"**Rep:** \"{fail.get('rep_response', 'N/A')}\"")
+                            
+                            st.markdown("**📊 Coaching Analysis:**")
+                            
+                            rep_attempted = fail.get('what_rep_attempted', '')
+                            if rep_attempted and rep_attempted.lower() not in ['none', 'nothing', '']:
+                                st.success(f"**✓ Rep Attempted:** {rep_attempted}")
+                            
+                            what_worked = fail.get('what_worked', '')
+                            if what_worked and what_worked.lower() not in ['none', '']:
+                                st.success(f"**✓ What Worked:** {what_worked}")
+                            
+                            st.error(f"**❌ What Was Missed:** {fail.get('what_was_missed', 'N/A')}")
+                            
+                            why_matters = fail.get('why_it_matters', '')
+                            if why_matters:
+                                st.warning(f"**⚠️ Why It Matters:** {why_matters}")
+                            
+                            st.markdown("**💡 Better Response:**")
+                            st.success(f"\"{fail.get('better_response', 'N/A')}\"")
+                            
+                            framework = fail.get('framework_connection', '')
+                            if framework:
+                                st.info(f"**🎓 Framework:** {framework}")
+                            
+                            st.markdown("---")
                     
+                    # === PROBING ===
                     probing_misses = feedback.get('missed_probing_opportunities', [])
                     if probing_misses:
                         st.markdown("### 🔍 Missed Probing Opportunities")
-                        for miss in probing_misses:
-                            with st.container():
-                                st.markdown(f"**⏱️ Timestamp: {miss.get('timestamp', 'N/A')}**")
-                                
-                                if audio_available and player_id:
-                                    ts = miss.get('timestamp', '00:00')
+                        
+                        for probe_idx, miss in enumerate(probing_misses):
+                            st.markdown(f"#### 📍 Opportunity {probe_idx + 1} - Timestamp: {miss.get('timestamp', 'N/A')}")
+                            
+                            # Audio jump button
+                            if audio_available and player_id:
+                                ts = miss.get('timestamp', '00:00')
+                                start_seconds = 0
+                                try:
+                                    if ':' in ts:
+                                        parts = ts.split(':')
+                                        if len(parts) == 2:
+                                            start_seconds = int(parts[0]) * 60 + int(parts[1])
+                                        elif len(parts) == 3:
+                                            start_seconds = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+                                    else:
+                                        start_seconds = int(float(ts))
+                                except:
                                     start_seconds = 0
-                                    try:
-                                        if ':' in ts:
-                                            parts = ts.split(':')
-                                            if len(parts) == 2:
-                                                start_seconds = int(parts[0]) * 60 + int(parts[1])
-                                            elif len(parts) == 3:
-                                                start_seconds = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
-                                        else:
-                                            start_seconds = int(float(ts))
-                                    except:
-                                        start_seconds = 0
-                                    
-                                    timestamp_button = f"""
-                                        <div style="margin-bottom:15px; padding:10px; background:#f0f8ff; border-radius:5px;">
-                                            <button onclick="var p = window.parent.document.getElementById('{player_id}'); if (p) {{ p.currentTime = {start_seconds}; p.play(); window.parent.scrollTo({{top: 0, behavior: 'smooth'}}); }}" 
-                                            style="padding:10px 20px; background:#4CAF50; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
-                                                ▶ Jump to {ts}
-                                            </button>
-                                        </div>
-                                    """
-                                    components.html(timestamp_button, height=80)
                                 
-                                col1, col2 = st.columns(2)
-                                with col1:
-                                    st.markdown("**What Happened:**")
-                                    st.info(f"**Customer's Surface Answer:** \"{miss.get('surface_answer', 'N/A')}\"")
+                                timestamp_button = f"""
+                                    <div style="margin-bottom:15px; padding:10px; background:#f0f8ff; border-radius:5px;">
+                                        <button onclick="var p = window.parent.document.getElementById('{player_id}'); if (p) {{ p.currentTime = {start_seconds}; p.play(); window.parent.scrollTo({{top: 0, behavior: 'smooth'}}); }}" 
+                                        style="padding:10px 20px; background:#4CAF50; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
+                                            ▶ Jump to {ts}
+                                        </button>
+                                    </div>
+                                """
+                                components.html(timestamp_button, height=80)
+                            
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                st.markdown("**What Happened:**")
+                                st.info(f"**Customer's Surface Answer:** \"{miss.get('surface_answer', 'N/A')}\"")
+                                
+                                what_did = miss.get('what_rep_did_instead', '')
+                                if what_did:
+                                    st.warning(f"**Rep Did Instead:** {what_did}")
+                                else:
                                     st.warning("**Rep moved on without digging deeper**")
                                 
-                                with col2:
-                                    st.markdown("**💡 Should Have Asked:**")
-                                    should_ask = miss.get('should_have_asked', '')
-                                    if should_ask:
-                                        st.success(f"\"{should_ask}\"")
+                                why_hurts = miss.get('why_stopping_hurts', '')
+                                if why_hurts:
+                                    st.error(f"**Cost of Stopping:** {why_hurts}")
+                            
+                            with col2:
+                                st.markdown("**💡 Should Have Asked:**")
+                                st.success(f"\"{miss.get('should_have_asked', 'N/A')}\"")
                                 
-                                st.markdown("---")
+                                why_works = miss.get('why_this_question_works', '')
+                                if why_works:
+                                    st.info(f"**Why This Works:** {why_works}")
+                                
+                                framework = miss.get('framework_connection', '')
+                                if framework:
+                                    st.info(f"**🎓 Framework:** {framework}")
+                            
+                            st.markdown("---")
                     
+                    # === EMOTIONAL CUES ===
                     emotional_misses = feedback.get('emotional_cues_missed', [])
                     if emotional_misses:
                         st.markdown("### 💭 Emotional Cues Missed")
                         emotion_icons = {
-                            "frustration": "😤",
-                            "hesitation": "🤔",
-                            "excitement": "😊",
-                            "concern": "😟",
-                            "doubt": "🤨"
+                            "frustration": "😤", "hesitation": "🤔", "excitement": "😊",
+                            "concern": "😟", "doubt": "🤨", "fear": "😰",
+                            "distrust": "🤐", "pain": "😣", "relief": "😌"
                         }
                         
-                        for miss in emotional_misses:
+                        for emo_idx, miss in enumerate(emotional_misses):
                             emotion = miss.get('customer_emotion', '')
                             icon = emotion_icons.get(emotion, "💭")
+                            ack_level = miss.get('rep_acknowledgment_level', 'none')
                             
-                            with st.container():
-                                st.markdown(f"**{icon} {emotion.title()} - Timestamp: {miss.get('timestamp', 'N/A')}**")
-                                
-                                if audio_available and player_id:
-                                    ts = miss.get('timestamp', '00:00')
+                            st.markdown(f"#### {icon} {emotion.title()} - Timestamp: {miss.get('timestamp', 'N/A')}")
+                            
+                            if ack_level == 'full':
+                                st.success("✅ Rep fully acknowledged this emotion")
+                            elif ack_level == 'partial':
+                                st.warning("⚠️ Rep partially acknowledged this emotion")
+                            else:
+                                st.error("❌ Rep did not acknowledge this emotion")
+                            
+                            # Audio jump button
+                            if audio_available and player_id:
+                                ts = miss.get('timestamp', '00:00')
+                                start_seconds = 0
+                                try:
+                                    if ':' in ts:
+                                        parts = ts.split(':')
+                                        if len(parts) == 2:
+                                            start_seconds = int(parts[0]) * 60 + int(parts[1])
+                                        elif len(parts) == 3:
+                                            start_seconds = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+                                    else:
+                                        start_seconds = int(float(ts))
+                                except:
                                     start_seconds = 0
-                                    try:
-                                        if ':' in ts:
-                                            parts = ts.split(':')
-                                            if len(parts) == 2:
-                                                start_seconds = int(parts[0]) * 60 + int(parts[1])
-                                            elif len(parts) == 3:
-                                                start_seconds = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
-                                        else:
-                                            start_seconds = int(float(ts))
-                                    except:
-                                        start_seconds = 0
+                                
+                                timestamp_button = f"""
+                                    <div style="margin-bottom:15px; padding:10px; background:#f0f8ff; border-radius:5px;">
+                                        <button onclick="var p = window.parent.document.getElementById('{player_id}'); if (p) {{ p.currentTime = {start_seconds}; p.play(); window.parent.scrollTo({{top: 0, behavior: 'smooth'}}); }}" 
+                                        style="padding:10px 20px; background:#4CAF50; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
+                                            ▶ Jump to {ts}
+                                        </button>
+                                    </div>
+                                """
+                                components.html(timestamp_button, height=80)
+                            
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                st.markdown("**What Happened:**")
+                                st.info(f"**Emotional Signal:** {miss.get('signal', 'N/A')}")
+                                
+                                rep_attempted = miss.get('rep_attempted', '')
+                                if rep_attempted and rep_attempted.lower() not in ['none', '']:
+                                    st.warning(f"**Rep Said:** {rep_attempted}")
                                     
-                                    timestamp_button = f"""
-                                        <div style="margin-bottom:15px; padding:10px; background:#f0f8ff; border-radius:5px;">
-                                            <button onclick="var p = window.parent.document.getElementById('{player_id}'); if (p) {{ p.currentTime = {start_seconds}; p.play(); window.parent.scrollTo({{top: 0, behavior: 'smooth'}}); }}" 
-                                            style="padding:10px 20px; background:#4CAF50; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
-                                                ▶ Jump to {ts}
-                                            </button>
-                                        </div>
-                                    """
-                                    components.html(timestamp_button, height=80)
+                                    what_worked = miss.get('what_worked', '')
+                                    if what_worked and what_worked.lower() not in ['none', '']:
+                                        st.success(f"**✓ What Worked:** {what_worked}")
                                 
-                                col1, col2 = st.columns(2)
-                                with col1:
-                                    st.markdown("**What Happened:**")
-                                    st.info(f"**Signal:** {miss.get('signal', 'N/A')}")
-                                    st.warning(f"**Rep Missed It:** {miss.get('rep_missed_it', 'N/A')}")
+                                rep_missed = miss.get('rep_missed_it', '')
+                                if rep_missed:
+                                    st.error(f"**❌ What Was Missed:** {rep_missed}")
                                 
-                                with col2:
-                                    st.markdown("**💡 Empathy Response:**")
-                                    empathy = miss.get('empathy_response', '')
-                                    if empathy:
-                                        st.success(f"\"{empathy}\"")
+                                why_matters = miss.get('why_it_matters', '')
+                                if why_matters:
+                                    st.warning(f"**⚠️ Impact:** {why_matters}")
+                            
+                            with col2:
+                                st.markdown("**💡 Complete Empathy Response:**")
+                                st.success(f"\"{miss.get('empathy_response', 'N/A')}\"")
                                 
-                                st.markdown("---")
+                                framework = miss.get('framework_connection', '')
+                                if framework:
+                                    st.info(f"**🎓 Framework:** {framework}")
+                            
+                            st.markdown("---")
                     
+                    # === OBJECTION HANDLING ===
                     objections = feedback.get('objection_handling_analysis', [])
                     if objections:
                         st.markdown("### 🛡️ Objection Handling Analysis")
-                        for obj in objections:
+                        
+                        for obj_idx, obj in enumerate(objections):
                             effectiveness = obj.get('effectiveness_rating', 0)
-                            color_indicator = "🟢" if effectiveness >= 7 else "🟡" if effectiveness >= 4 else "🔴"
+                            color = "🟢" if effectiveness >= 7 else "🟡" if effectiveness >= 4 else "🔴"
                             
-                            with st.container():
-                                st.markdown(f"**{color_indicator} Objection: \"{obj.get('objection', '')}\"** (Effectiveness: {effectiveness}/10)")
-                                st.markdown(f"**⏱️ Timestamp: {obj.get('timestamp', 'N/A')}**")
-                                
-                                if audio_available and player_id:
-                                    ts = obj.get('timestamp', '00:00')
+                            st.markdown(f"#### {color} Objection {obj_idx + 1}: \"{obj.get('objection', '')}\"")
+                            st.caption(f"Effectiveness: {effectiveness}/10 | Timestamp: {obj.get('timestamp', 'N/A')}")
+                            
+                            # Audio jump button
+                            if audio_available and player_id:
+                                ts = obj.get('timestamp', '00:00')
+                                start_seconds = 0
+                                try:
+                                    if ':' in ts:
+                                        parts = ts.split(':')
+                                        if len(parts) == 2:
+                                            start_seconds = int(parts[0]) * 60 + int(parts[1])
+                                        elif len(parts) == 3:
+                                            start_seconds = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
+                                    else:
+                                        start_seconds = int(float(ts))
+                                except:
                                     start_seconds = 0
-                                    try:
-                                        if ':' in ts:
-                                            parts = ts.split(':')
-                                            if len(parts) == 2:
-                                                start_seconds = int(parts[0]) * 60 + int(parts[1])
-                                            elif len(parts) == 3:
-                                                start_seconds = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
-                                        else:
-                                            start_seconds = int(float(ts))
-                                    except:
-                                        start_seconds = 0
-                                    
-                                    timestamp_button = f"""
-                                        <div style="margin-bottom:15px; padding:10px; background:#f0f8ff; border-radius:5px;">
-                                            <button onclick="var p = window.parent.document.getElementById('{player_id}'); if (p) {{ p.currentTime = {start_seconds}; p.play(); window.parent.scrollTo({{top: 0, behavior: 'smooth'}}); }}" 
-                                            style="padding:10px 20px; background:#4CAF50; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
-                                                ▶ Jump to {ts}
-                                            </button>
-                                        </div>
-                                    """
-                                    components.html(timestamp_button, height=80)
                                 
-                                col1, col2 = st.columns(2)
-                                with col1:
-                                    st.markdown("**What Happened:**")
-                                    st.info(f"**Real Objection:** {obj.get('real_objection', 'Unknown')}")
-                                    st.warning(f"**Rep's Response:** \"{obj.get('rep_response', 'N/A')}\"")
-                                    
-                                    if obj.get('went_straight_to_discount'):
-                                        st.error("⚠️ **Rep went straight to discount!**")
-                                    
-                                    if not obj.get('value_established'):
-                                        st.error("💰 **Value was NOT established first**")
+                                timestamp_button = f"""
+                                    <div style="margin-bottom:15px; padding:10px; background:#f0f8ff; border-radius:5px;">
+                                        <button onclick="var p = window.parent.document.getElementById('{player_id}'); if (p) {{ p.currentTime = {start_seconds}; p.play(); window.parent.scrollTo({{top: 0, behavior: 'smooth'}}); }}" 
+                                        style="padding:10px 20px; background:#4CAF50; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
+                                            ▶ Jump to {ts}
+                                        </button>
+                                    </div>
+                                """
+                                components.html(timestamp_button, height=80)
+                            
+                            st.markdown("**🎯 The Real Issue:**")
+                            st.info(f"{obj.get('real_objection', 'Unknown')}")
+                            
+                            st.markdown("---")
+                            
+                            col1, col2 = st.columns([1, 1])
+                            
+                            with col1:
+                                st.markdown("**📋 What Happened:**")
+                                st.warning(f"**Rep's Response:** \"{obj.get('rep_response', 'N/A')}\"")
                                 
-                                with col2:
-                                    st.markdown("**💡 Better Approach:**")
-                                    st.info(f"**Sandler Technique:** {obj.get('sandler_technique_missed', 'N/A')}")
-                                    value_resp = obj.get('value_based_response', '')
-                                    if value_resp:
-                                        st.success(f"**Value-Based Response:** \"{value_resp}\"")
+                                rep_attempted = obj.get('rep_attempted', '')
+                                if rep_attempted and rep_attempted.lower() not in ['none', '']:
+                                    st.info(f"**Rep Attempted:** {rep_attempted}")
                                 
-                                st.markdown("---")
+                                what_worked = obj.get('what_worked', '')
+                                if what_worked and what_worked.lower() not in ['none', 'nothing']:
+                                    st.success(f"**✓ What Worked:** {what_worked}")
+                            
+                            with col2:
+                                st.markdown("**❌ Critical Failures:**")
+                                failures = obj.get('critical_failures', [])
+                                if failures:
+                                    for failure in failures:
+                                        st.error(f"• {failure}")
+                                
+                                if obj.get('went_straight_to_discount'):
+                                    st.error("💰 **Jumped straight to discount!**")
+                                
+                                if not obj.get('value_established'):
+                                    st.error("⚠️ **Value was NOT established first**")
+                            
+                            st.markdown("---")
+                            
+                            st.markdown("**💡 Step-by-Step Better Approach:**")
+                            
+                            steps = obj.get('step_by_step_better_approach', [])
+                            if steps:
+                                for step in steps:
+                                    step_num = step.get('step', '')
+                                    action = step.get('action', '')
+                                    example = step.get('example', '')
+                                    why = step.get('why', '')
+                                    
+                                    st.markdown(f"**Step {step_num}: {action}**")
+                                    st.success(f"💬 \"{example}\"")
+                                    if why:
+                                        st.caption(f"📖 {why}")
+                                    st.markdown("")
+                            
+                            st.markdown("**🎓 Framework Recommendation:**")
+                            col1, col2 = st.columns(2)
+                            
+                            with col1:
+                                technique = obj.get('sandler_technique_recommended', '')
+                                if technique:
+                                    st.info(f"**Sandler Technique:** {technique}")
+                                
+                                why_tech = obj.get('why_this_technique', '')
+                                if why_tech:
+                                    st.caption(f"💡 {why_tech}")
+                            
+                            with col2:
+                                frameworks = obj.get('framework_connections', '')
+                                if frameworks:
+                                    st.info(f"**Framework Principles:** {frameworks}")
+                            
+                            st.markdown("---")
                     
+                    # What Went Well / Opportunities
                     col1, col2 = st.columns(2)
                     
                     with col1:
@@ -929,6 +1084,7 @@ with tab1:
                         else:
                             st.info("Building feedback...")
                     
+                    # Sample Phrases
                     phrases = feedback.get('sample_phrases', {})
                     if phrases:
                         st.markdown("### 💬 Sample Phrases to Practice")
@@ -962,9 +1118,11 @@ with tab1:
                                     for phrase in phrases.get('sandler_pain', []):
                                         st.markdown(f"- _{phrase}_")
                     
+                    # Show full transcript
                     with st.expander("📄 Full Transcript"):
                         st.text(row['transcript'])
 
+# ===== TAB 2: EXCEPTIONAL MOMENTS =====
 with tab2:
     st.header("🌟 Exceptional Moments Feed")
     st.caption("Share these wins with your team!")
@@ -989,41 +1147,11 @@ with tab2:
     else:
         for call in exceptional_calls:
             row = call['row']
-            feedback = row['feedback_parsed']
-            
             with st.expander(f"⭐ {row['agent_name']} - {row['filename']} ({row['date']})"):
                 st.write(f"**Agent:** {row['agent_name']}")
-                st.write(f"**Call Outcome:** {feedback.get('call_outcome', 'unknown').upper()}")
+                st.write(f"**Call Outcome:** {row['feedback_parsed'].get('call_outcome', 'unknown').upper()}")
                 
                 st.markdown("---")
-                
-                audio_available = False
-                google_drive_url = None
-                player_id = None
-                
-                if pd.notna(row.get('audio_url')) and row.get('audio_url'):
-                    audio_available = True
-                    google_drive_url = row['audio_url']
-                    
-                    if 'drive.google.com' in google_drive_url:
-                        with st.spinner("🎧 Loading audio player..."):
-                            audio_base64 = download_audio_from_gdrive(google_drive_url, row['filename'])
-                        
-                        if audio_base64:
-                            player_id = f"exc_audio_{row['filename'].replace(' ', '_').replace('.', '_')}"
-                            
-                            audio_html = f"""
-                            <div style="background: white; padding: 15px; border: 2px solid #4CAF50; border-radius: 8px; margin-bottom: 20px;">
-                                <p style="margin: 0 0 10px 0; font-weight: bold; color: #333;">
-                                    🎧 Audio Player - Jump to exceptional moments below
-                                </p>
-                                <audio id="{player_id}" controls style="width: 100%;">
-                                    <source src="data:audio/wav;base64,{audio_base64}" type="audio/wav">
-                                </audio>
-                            </div>
-                            """
-                            
-                            st.markdown(audio_html, unsafe_allow_html=True)
                 
                 for moment in call['moments']:
                     category = moment.get('category', 'general')
@@ -1038,45 +1166,12 @@ with tab2:
                     st.markdown(f"### {icon} {category.replace('_', ' ').title()}")
                     st.markdown(f"**⏱️ Timestamp: {moment.get('timestamp', 'N/A')}**")
                     
-                    if audio_available and player_id:
-                        ts = moment.get('timestamp', '00:00')
-                        
-                        start_seconds = 0
-                        try:
-                            if ':' in ts:
-                                parts = ts.split(':')
-                                if len(parts) == 2:
-                                    start_seconds = int(parts[0]) * 60 + int(parts[1])
-                                elif len(parts) == 3:
-                                    start_seconds = int(parts[0]) * 3600 + int(parts[1]) * 60 + int(parts[2])
-                            else:
-                                start_seconds = int(float(ts))
-                        except:
-                            start_seconds = 0
-                        
-                        timestamp_button = f"""
-                            <div style="margin-bottom:15px; padding:10px; background:#f0f8ff; border-radius:5px;">
-                                <button onclick="var p = window.parent.document.getElementById('{player_id}'); if (p) {{ p.currentTime = {start_seconds}; p.play(); }}" 
-                                style="padding:10px 20px; background:#FF6B35; color:white; border:none; border-radius:5px; cursor:pointer; font-weight:bold;">
-                                    ▶ Jump to {ts}
-                                </button>
-                                <span style="margin-left:10px; color:#666; font-size:0.9em;">
-                                    Listen to this exceptional moment
-                                </span>
-                            </div>
-                        """
-                        components.html(timestamp_button, height=80)
-                    
                     col1, col2 = st.columns(2)
                     
                     with col1:
-                        st.markdown("**💬 Full Exchange:**")
-                        full_exchange = moment.get('full_exchange', '')
-                        if full_exchange:
-                            st.info(full_exchange)
-                        else:
-                            st.info(f"**Customer:** \"{moment.get('customer_quote', 'N/A')}\"")
-                            st.success(f"**Rep:** \"{moment.get('rep_quote', 'N/A')}\"")
+                        st.markdown("**💬 What Was Said:**")
+                        st.info(f"**Customer:** \"{moment.get('customer_quote', 'N/A')}\"")
+                        st.success(f"**Rep:** \"{moment.get('rep_quote', 'N/A')}\"")
                     
                     with col2:
                         st.markdown("**🎯 Why This Works:**")
@@ -1087,6 +1182,7 @@ with tab2:
                     
                     st.markdown("---")
 
+# ===== TAB 3: TEAM ANALYTICS =====
 with tab3:
     st.header("📊 Team Analytics Dashboard")
     
@@ -1181,6 +1277,7 @@ with tab3:
     else:
         st.info("Not enough data yet")
 
+# ===== TAB 4: CALL SEARCH =====
 with tab4:
     st.header("🔍 Advanced Call Search")
     
