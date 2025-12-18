@@ -90,6 +90,33 @@ def parse_feedback(feedback_str):
     except:
         return {}
 
+def filter_by_time_period(df, time_filter):
+    """Filter dataframe by selected time period"""
+    if df.empty or 'date' not in df.columns:
+        return df
+    
+    # Convert date column to datetime if it isn't already
+    try:
+        df['date_parsed'] = pd.to_datetime(df['date'], errors='coerce')
+    except:
+        return df  # If date parsing fails, return unfiltered
+    
+    now = datetime.now()
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    
+    if time_filter == "Today":
+        filtered = df[df['date_parsed'] >= today_start]
+    elif time_filter == "This Week":
+        week_start = today_start - timedelta(days=today_start.weekday())
+        filtered = df[df['date_parsed'] >= week_start]
+    elif time_filter == "This Month":
+        month_start = today_start.replace(day=1)
+        filtered = df[df['date_parsed'] >= month_start]
+    else:  # All Time
+        filtered = df
+    
+    return filtered
+
 def aggregate_rep_performance(df, agent_name):
     """Aggregate all performance data for a specific rep"""
     agent_calls = df[df['agent_name'] == agent_name]
@@ -223,22 +250,38 @@ with st.sidebar:
     st.header("📊 Dashboard Controls")
     if st.button("🔄 Refresh Data"):
         st.cache_data.clear()
+        # Clear session state to force reload
+        if 'filtered_df' in st.session_state:
+            del st.session_state['filtered_df']
         st.rerun()
     
     date_filter = st.selectbox(
         "Time Period",
-        ["Today", "This Week", "This Month", "All Time"]
+        ["Today", "This Week", "This Month", "All Time"],
+        key="time_filter"
     )
     
     st.markdown("---")
     st.caption("💾 Data synced from Google Sheets")
     st.caption("🎓 Coaching analysis by GPT-4")
 
-# Load data
-df = load_data()
+# Load data ONCE and cache it
+raw_df = load_data()
 
-if df.empty:
+if raw_df.empty:
     st.warning("No data available yet. Upload call recordings to start!")
+    st.stop()
+
+# Apply time filter - this runs on filter change
+df = filter_by_time_period(raw_df, date_filter)
+
+# Show count in sidebar
+with st.sidebar:
+    st.caption(f"📞 Showing {len(df)} of {len(raw_df)} calls")
+
+# Handle empty filtered results
+if df.empty and date_filter != "All Time":
+    st.info(f"No calls found for '{date_filter}'. Try a different time period or check back later!")
     st.stop()
 
 # ---------- TABS ----------
