@@ -611,6 +611,8 @@ with tab1:
             score = feedback.get('call_score', {}).get('overall_score', 0) if feedback else 0
 
             with st.expander(f"{icon} {row['filename']} — {outcome.upper()} | Score: {score}/10 ({row['date']})"):
+                if not feedback:
+                    st.info("⏳ Coaching analysis pending — check back in a few minutes.")
                 if feedback:
                     # Call summary header
                     col1, col2, col3 = st.columns(3)
