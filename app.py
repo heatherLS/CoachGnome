@@ -692,25 +692,36 @@ with tab1:
                             col1, col2 = st.columns(2)
                             with col1:
                                 st.markdown("**💬 What Was Said:**")
-                                st.info(f"**Customer:** \"{fail.get('customer_said','')}\"")
-                                st.warning(f"**Rep:** \"{fail.get('rep_response','')}\"")
-                                attempted = fail.get('what_rep_attempted', '')
+                                customer_said = fail.get('customer_said', '')
+                                rep_response = fail.get('rep_response', '')
+                                if customer_said:
+                                    st.info(f"**Customer:** \"{customer_said}\"")
+                                if rep_response:
+                                    st.warning(f"**Here was your reply:** \"{rep_response}\"")
                                 worked = fail.get('what_worked', '')
-                                if attempted and attempted.lower() not in ['none', '']:
-                                    st.success(f"✓ **Rep attempted:** {attempted}")
                                 if worked and worked.lower() not in ['none', '']:
                                     st.success(f"✓ **What worked:** {worked}")
 
                             with col2:
                                 st.markdown("**💡 Step-by-Step Better Approach:**")
-                                why = fail.get('why_it_matters', '')
-                                better = fail.get('better_response', '')
-                                st.markdown("**Step 1: Mirror & Acknowledge**")
-                                if why:
-                                    st.caption(f"📖 {why}")
-                                st.markdown("**Step 2: Say This Instead**")
-                                if better:
-                                    st.success(f'💬 "{better}"')
+                                steps = fail.get('step_by_step_better_approach', [])
+                                if steps:
+                                    for step in steps:
+                                        st.markdown(f"**Step {step.get('step','')}: {step.get('action','')}**")
+                                        if step.get('example'):
+                                            st.success(f'💬 "{step.get(\"example\",\"\")}"')
+                                        if step.get('why'):
+                                            st.caption(f"📖 {step.get('why','')}")
+                                        st.markdown("")
+                                else:
+                                    why = fail.get('why_it_matters', '')
+                                    better = fail.get('better_response', '')
+                                    st.markdown("**Step 1: Mirror & Acknowledge**")
+                                    if why:
+                                        st.caption(f"📖 {why}")
+                                    st.markdown("**Step 2: Say This Instead**")
+                                    if better:
+                                        st.success(f'💬 "{better}"')
 
                             st.markdown("---")
 
@@ -734,28 +745,39 @@ with tab1:
                             col1, col2 = st.columns(2)
                             with col1:
                                 st.markdown("**💬 What Happened:**")
-                                st.info(f"**Customer said:** \"{surface}\"")
-                                attempted = miss.get('rep_attempted', '')
+                                if surface:
+                                    st.info(f"**Customer said:** \"{surface}\"")
+                                attempted = miss.get('rep_attempted', '') or miss.get('rep_response', '')
                                 worked = miss.get('what_worked', '')
                                 did_instead = miss.get('what_rep_did_instead', '')
                                 if attempted and attempted.lower() not in ['none', '']:
-                                    st.warning(f"**Rep asked:** \"{attempted}\"")
+                                    st.warning(f"**Here was your question:** \"{attempted}\"")
                                 if worked and worked.lower() not in ['none', '']:
                                     st.success(f"✓ **What worked:** {worked}")
-                                if did_instead:
-                                    st.error(f"**Then rep:** {did_instead}")
+                                if did_instead and did_instead.lower() not in ['none', '']:
+                                    st.error(f"**Then you:** {did_instead}")
 
                             with col2:
                                 st.markdown("**💡 Step-by-Step Better Approach:**")
-                                should_ask = miss.get('should_have_asked', '')
-                                why_works = miss.get('why_this_question_works', '')
-                                st.markdown("**Step 1: Don't stop — ask the follow-up**")
-                                if should_ask:
-                                    st.success(f'💬 "{should_ask}"')
-                                if why_works:
-                                    st.caption(f"📖 {why_works}")
-                                st.markdown("**Step 2: Sit with the answer — then dig one more level**")
-                                st.info("Ask: 'Tell me more about that...' or 'What does that mean for you?'")
+                                steps = miss.get('step_by_step_better_approach', [])
+                                if steps:
+                                    for step in steps:
+                                        st.markdown(f"**Step {step.get('step','')}: {step.get('action','')}**")
+                                        if step.get('example'):
+                                            st.success(f'💬 "{step.get(\"example\",\"\")}"')
+                                        if step.get('why'):
+                                            st.caption(f"📖 {step.get('why','')}")
+                                        st.markdown("")
+                                else:
+                                    should_ask = miss.get('should_have_asked', '')
+                                    why_works = miss.get('why_this_question_works', '')
+                                    st.markdown("**Step 1: Don't stop — ask the follow-up**")
+                                    if should_ask:
+                                        st.success(f'💬 "{should_ask}"')
+                                    if why_works:
+                                        st.caption(f"📖 {why_works}")
+                                    st.markdown("**Step 2: Sit with the answer — then dig one more level**")
+                                    st.info("Ask: 'Tell me more about that...' or 'What does that mean for you?'")
 
                             st.markdown("---")
 
@@ -800,7 +822,7 @@ with tab1:
                                 worked = miss.get('what_worked', '')
                                 why_matters = miss.get('why_it_matters', '')
                                 if attempted and attempted.lower() not in ['none', '']:
-                                    st.warning(f"**Rep said:** \"{attempted}\"")
+                                    st.warning(f"**Here was your reply:** \"{attempted}\"")
                                 if worked and worked.lower() not in ['none', '']:
                                     st.success(f"✓ **What worked:** {worked}")
                                 if why_matters:
@@ -808,12 +830,22 @@ with tab1:
 
                             with col2:
                                 st.markdown("**💡 Step-by-Step Better Approach:**")
-                                empathy = miss.get('empathy_response', '')
-                                st.markdown("**Step 1: Name the emotion specifically**")
-                                st.info("Generic empathy = 'I understand.' | Targeted empathy = naming exactly what they felt.")
-                                st.markdown("**Step 2: Say this instead**")
-                                if empathy:
-                                    st.success(f'💬 "{empathy}"')
+                                steps = miss.get('step_by_step_better_approach', [])
+                                if steps:
+                                    for step in steps:
+                                        st.markdown(f"**Step {step.get('step','')}: {step.get('action','')}**")
+                                        if step.get('example'):
+                                            st.success(f'💬 "{step.get(\"example\",\"\")}"')
+                                        if step.get('why'):
+                                            st.caption(f"📖 {step.get('why','')}")
+                                        st.markdown("")
+                                else:
+                                    empathy = miss.get('empathy_response', '')
+                                    st.markdown("**Step 1: Name the emotion specifically**")
+                                    st.info("Generic empathy = 'I understand.' | Targeted empathy = naming exactly what they felt.")
+                                    st.markdown("**Step 2: Say this instead**")
+                                    if empathy:
+                                        st.success(f'💬 "{empathy}"')
 
                             st.markdown("---")
 
@@ -836,11 +868,11 @@ with tab1:
                             col1, col2 = st.columns(2)
                             with col1:
                                 st.markdown("**💬 What Was Said:**")
-                                st.warning(f"**Rep's response:** \"{obj.get('rep_response','')}\"")
+                                st.warning(f"**Here was your reply:** \"{obj.get('rep_response','')}\"")
                                 attempted = obj.get('rep_attempted', '')
                                 worked = obj.get('what_worked', '')
                                 if attempted and attempted.lower() not in ['none', '']:
-                                    st.info(f"**Rep attempted:** {attempted}")
+                                    st.info(f"**What you tried:** {attempted}")
                                 if worked and worked.lower() not in ['none', 'nothing']:
                                     st.success(f"✓ **What worked:** {worked}")
 
@@ -918,7 +950,11 @@ with tab1:
                                             st.markdown(f"- _{phrase}_")
 
                     with st.expander("📄 Full Transcript"):
-                        st.text(row.get('transcript', ''))
+                        transcript = row.get('transcript', '')
+                        if pd.isna(transcript) or not transcript or str(transcript).lower() == 'nan':
+                            st.info("Transcript not available for this call.")
+                        else:
+                            st.text(str(transcript))
 
 # ===== TAB 2: EXCEPTIONAL MOMENTS =====
 with tab2:
