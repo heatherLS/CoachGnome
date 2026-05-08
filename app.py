@@ -57,12 +57,17 @@ def parse_feedback(feedback_str):
     if pd.isna(feedback_str) or not feedback_str:
         return {}
     try:
-        clean_str = feedback_str.strip()
+        clean_str = str(feedback_str).strip()
         if clean_str.startswith('```'):
             clean_str = clean_str.split('```')[1]
             if clean_str.startswith('json'):
                 clean_str = clean_str[4:]
-        return json.loads(clean_str.strip())
+        clean_str = clean_str.strip()
+        try:
+            return json.loads(clean_str)
+        except json.JSONDecodeError:
+            from json_repair import repair_json
+            return json.loads(repair_json(clean_str))
     except:
         return {}
 
