@@ -709,7 +709,7 @@ with tab1:
                                     for step in steps:
                                         st.markdown(f"**Step {step.get('step','')}: {step.get('action','')}**")
                                         if step.get('example'):
-                                            st.success(f'💬 "{step.get(\"example\",\"\")}"')
+                                            st.success('💬 "' + step.get('example', '') + '"')
                                         if step.get('why'):
                                             st.caption(f"📖 {step.get('why','')}")
                                         st.markdown("")
@@ -764,7 +764,7 @@ with tab1:
                                     for step in steps:
                                         st.markdown(f"**Step {step.get('step','')}: {step.get('action','')}**")
                                         if step.get('example'):
-                                            st.success(f'💬 "{step.get(\"example\",\"\")}"')
+                                            st.success('💬 "' + step.get('example', '') + '"')
                                         if step.get('why'):
                                             st.caption(f"📖 {step.get('why','')}")
                                         st.markdown("")
@@ -835,7 +835,7 @@ with tab1:
                                     for step in steps:
                                         st.markdown(f"**Step {step.get('step','')}: {step.get('action','')}**")
                                         if step.get('example'):
-                                            st.success(f'💬 "{step.get(\"example\",\"\")}"')
+                                            st.success('💬 "' + step.get('example', '') + '"')
                                         if step.get('why'):
                                             st.caption(f"📖 {step.get('why','')}")
                                         st.markdown("")
